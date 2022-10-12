@@ -11,10 +11,43 @@ float calculate_distance(float* point_root,float* point_target){
 
     distance = pow(point_root[0] - point_target[0],2) + pow(point_root[1] - point_target[1],2);
     distance = sqrtf(distance);
-
-    cout << point_root[0] << "," << point_target[0] << "," << point_root[1] << "," << point_target[1] << "," << distance << "\n";
+    //linea para ver que funcione bien, borrar al terminar
+    //cout << point_root[0] << "," << point_target[0] << "," << point_root[1] << "," << point_target[1] << "," << distance << "\n";
 
     return distance;
+}
+
+void add_new_cores(float** core_points, long long int core_size, float** noise_points, int noise_size,float epsilon) {
+    //la 1ra pasada identifica los puntos que castean radio
+    // esta pasada ve si está dentro de la distancia. Por el punto dado, calc la dist con esos core_points
+    for(long long int i=0; i < core_size; i++){
+        for(long long int j=0; j < noise_size; j++){
+            float dist = calculate_distance(noise_points[j], core_points[i]);
+            if(dist > epsilon){
+                noise_points[j][2] = 1.0;
+            }
+            else {
+                noise_points[j][2] = 0;
+            }
+        }  
+    }
+}
+
+void find_noise(float** points,long long int size,float epsilon){
+    float distance = 0;
+
+    for (long long int i=0; i<size; i++){
+        if (points[i][2]!=2){
+            for (long long int j=0; j<size; j++){
+                if (points[j][2]==2){
+                    distance = calculate_distance(points[j],points[i]);
+                    if (distance <= epsilon){
+                        points[i][2]=1;
+                    }
+                }
+            }
+        }
+    }
 }
 
 long int region_query(float** points, long long int point, float epsilon,long long int size){
@@ -39,6 +72,8 @@ void noise_detection(float** points, float epsilon, int min_samples, long long i
             points[i][2] = 2;
         }
     }
+    find_noise(points,size,epsilon);
+
     cout << "Complete" << "\n"; 
 }
 
@@ -73,8 +108,8 @@ void save_to_CSV(string file_name, float** points, long long int size) {
 int main(int argc, char** argv) {
 
     const float epsilon = 0.03;
-    const int min_samples = 2;
-    const long long int size = 100;
+    const int min_samples = 10;
+    const long long int size = 20000;
     const string input_file_name = to_string(size)+"_data.csv";
     const string output_file_name = to_string(size)+"_results.csv";    
     float** points = new float*[size];
@@ -90,9 +125,7 @@ int main(int argc, char** argv) {
 
     noise_detection(points, epsilon, min_samples, size);
 
-    for(long long int i = 0; i < size; i++) {
-        cout << points[i][0] << "," << points[i][1] << "," << points[i][2] << "\n";
-    }
+    save_to_CSV(output_file_name, points, size);
 
     for(long long int i = 0; i < size; i++) {
         delete[] points[i];
