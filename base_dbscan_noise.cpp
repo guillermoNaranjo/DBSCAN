@@ -6,13 +6,38 @@
 
 using namespace std;
 
+float calculate_distance(float* point_root,float* point_target){
+    float distance = 0.0;
+
+    distance = pow(point_root[0] - point_target[0],2) + pow(point_root[1] - point_target[1],2);
+    distance = sqrtf(distance);
+
+    return distance;
+}
 
 void noise_detection(float** points, float epsilon, int min_samples, long long int size) {
     cout << "Step 0" << "\n"; 
     for (long long int i=0; i < size; i++) {
-        points[i][2] = rand() % 2;
-    }      
+        long int num_vecinos = region_query(points,i,epsilon,size);
+        if(num_vecinos>=min_samples){
+            //número 2 significa nodo core, los nodos que no sean core de grado uno quedarán en 0
+            points[i][2] = 2;
+        }
+    }
     cout << "Complete" << "\n"; 
+}
+
+long int region_query(float** points, long long int point, float epsilon,long long int size){
+    long int numero_vecinos = 0;
+    float distancia = 0;
+
+    for (long long int i=0; i<size; i++){
+        distancia = calculate_distance(points[i],points[point]);
+        if (distancia <= epsilon){
+            numero_vecinos ++;
+        }
+    }
+    return numero_vecinos-1;
 }
 
 void load_CSV(string file_name, float** points, long long int size) {
@@ -62,8 +87,9 @@ int main(int argc, char** argv) {
     load_CSV(input_file_name, points, size);
     
     noise_detection(points, epsilon, min_samples, size); 
-        
+
     save_to_CSV(output_file_name, points, size);
+
 
     for(long long int i = 0; i < size; i++) {
         delete[] points[i];
