@@ -21,13 +21,12 @@ void add_2d_cores(float** points,long long int size,float epsilon){
     float distance = 0;
 
     for (long long int i=0; i<size; i++){
-        if (points[i][2]==0){
+        if (points[i][2]!=2){
             for (long long int j=0; j<size; j++){
                 if (points[j][2]==2){
                     distance = calculate_distance(points[j],points[i]);
                     if (distance <= epsilon){
                         points[i][2]=1;
-                        continue;
                     }
                 }
             }
@@ -45,20 +44,22 @@ long int region_query(float** points, long long int point, float epsilon,long lo
             numero_vecinos ++;
         }
     }
-    return numero_vecinos;
+    return numero_vecinos-1;
 }
 
-void noise_detection(float** points, float epsilon, int min_samples, long long int size) {
-    //cout << "Step 0" << "\n"; 
-    for (long long int i=0; i < size; i++) {
-        long int num_vecinos = region_query(points,i,epsilon,size);
-        if(num_vecinos>=min_samples){
-            //número 2 significa nodo core, los nodos que no sean core de grado uno quedarán en 0
-            points[i][2] = 2;
+void noise_detection(float** points, float epsilon, int min_samples, long long int size,long long int chunk_size) {
+    int i=0;
+    #pragma omp parallel shared(points,epsilon,min_samples,chunk_size,size) private(i) 
+    {
+        #pragma omp for schedule(dynamic,chunk_size)
+        for (i=0; i < size; i++){
+            long int num_vecinos = region_query(points,i,epsilon,size);
+            if(num_vecinos>=min_samples){
+                //número 2 significa nodo core, los nodos que no sean core de grado uno quedarán en 0
+                points[i][2] = 2;
+            }
         }
     }
-    add_2d_cores(points,size,epsilon);
-
     //cout << "Complete" << "\n"; 
 }
 
@@ -92,14 +93,19 @@ void save_to_CSV(string file_name, float** points, long long int size) {
 
 int main(int argc, char** argv) {
     //parametrizar programa
+    //parámetros para paralelizar
+    //int num_hilos = atoi(argv[2]);
+    int num_hilos = 4;
     const float epsilon = 0.03;
     const int min_samples = 10;
-    const long long int size = atol(argv[1]);
+    //const long long int size = atol(argv[1]);
+    const long long int size = 20000;
     const string input_file_name = to_string(size)+"_data.csv";
     const string output_file_name = to_string(size)+"_results.csv";    
     float** points = new float*[size];
     double start = 0;
     double end = 0;
+    long long int chunk_size = 2000;
 
     for(long long int i = 0; i < size; i++) {
         points[i] = new float[3]{0.0, 0.0, 0.0}; 
@@ -110,9 +116,11 @@ int main(int argc, char** argv) {
 
     load_CSV(input_file_name, points, size);
 
+    omp_set_num_threads(num_hilos);
+
     start = omp_get_wtime();
 
-    noise_detection(points, epsilon, min_samples, size);
+    noise_detection(points, epsilon, min_samples, size, chunk_size);
 
     end = omp_get_wtime();
 
