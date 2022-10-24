@@ -19,10 +19,13 @@ float calculate_distance(float* point_root,float* point_target){
 
 void add_2d_cores(float** points,long long int size,float epsilon){
     float distance = 0;
+    long long int i=0;
+    long long int j=0;
 
-    for (long long int i=0; i<size; i++){
+    #pragma omp parallel for shared(points, size, epsilon) private(i,j)
+    for (i=0; i<size; i++){
         if (points[i][2]!=2){
-            for (long long int j=0; j<size; j++){
+            for (j=0; j<size; j++){
                 if (points[j][2]==2){
                     distance = calculate_distance(points[j],points[i]);
                     if (distance <= epsilon){
@@ -34,33 +37,47 @@ void add_2d_cores(float** points,long long int size,float epsilon){
     }
 }
 
-long int region_query(float** points, long long int point, float epsilon,long long int size){
-    long int numero_vecinos = 0;
-    float distancia = 0;
-
-    for (long long int i=0; i<size; i++){
-        distancia = calculate_distance(points[i],points[point]);
-        if (distancia <= epsilon){
-            numero_vecinos ++;
+void no_core_to_core(float** points,long long int size){
+    long long int i = 0;
+    
+    #pragma omp parallel for shared(points,size) private(i)
+    for (i=0; i<size; i++){
+        if (points[i][2]==1){
+            points[i][2]=2;
         }
     }
-    return numero_vecinos-1;
+}
+
+long int region_query(float** points, long long int point, float epsilon,long long int size,long long int chunk_size){
+    long int numero_vecinos = 0;
+    float distancia = 0;
+    long long int i = 0;
+
+    #pragma omp parallel shared(points,epsilon,numero_vecinos,chunk_size) private(i,distancia)
+    {
+        #pragma omp for schedule(static,chunk_size) reduction(+:numero_vecinos)
+        for (i=0; i<size;i++){
+            distancia = calculate_distance(points[i],points[point]);
+            if (distancia <= epsilon) {
+                numero_vecinos++;
+            }
+        }
+    }
+    return numero_vecinos;
 }
 
 void noise_detection(float** points, float epsilon, int min_samples, long long int size,long long int chunk_size) {
     int i=0;
-    #pragma omp parallel shared(points,epsilon,min_samples,chunk_size,size) private(i) 
-    {
-        #pragma omp for schedule(dynamic,chunk_size)
-        for (i=0; i < size; i++){
-            long int num_vecinos = region_query(points,i,epsilon,size);
-            if(num_vecinos>=min_samples){
-                //número 2 significa nodo core, los nodos que no sean core de grado uno quedarán en 0
-                points[i][2] = 2;
-            }
+    //#pragma omp parallel for shared(points,epsilon,min_samples,chunk_size,size) private(i) 
+    for (i=0; i < size; i++){
+        long int num_vecinos = region_query(points,i,epsilon,size,chunk_size);
+        if(num_vecinos>=min_samples){
+            //número 2 significa nodo core, los nodos que no sean core de grado uno quedarán en 0
+            points[i][2] = 2;
         }
     }
-    //cout << "Complete" << "\n"; 
+    add_2d_cores(points,size,epsilon);
+    no_core_to_core(points,size);
 }
 
 void load_CSV(string file_name, float** points, long long int size) {
@@ -94,18 +111,18 @@ void save_to_CSV(string file_name, float** points, long long int size) {
 int main(int argc, char** argv) {
     //parametrizar programa
     //parámetros para paralelizar
-    //int num_hilos = atoi(argv[2]);
-    int num_hilos = 4;
+    int num_hilos = 8;
+    //const int num_hilos = atoi(argv[2]);
     const float epsilon = 0.03;
     const int min_samples = 10;
-    //const long long int size = atol(argv[1]);
-    const long long int size = 20000;
+    const long long int size = atol(argv[1]);
+    //const long long int size = 1000;
     const string input_file_name = to_string(size)+"_data.csv";
-    const string output_file_name = to_string(size)+"_results.csv";    
+    const string output_file_name = to_string(size)+"_results_paralelo.csv";    
     float** points = new float*[size];
     double start = 0;
     double end = 0;
-    long long int chunk_size = 2000;
+    long long int chunk_size = size/num_hilos;
 
     for(long long int i = 0; i < size; i++) {
         points[i] = new float[3]{0.0, 0.0, 0.0}; 
@@ -127,7 +144,7 @@ int main(int argc, char** argv) {
     save_to_CSV(output_file_name, points, size);
     
     //Imprimir resultados
-    cout << "(" << end - start << "," << size << ")" << "\n";
+    cout << "(" << end - start << "," << size << "," << num_hilos << ")" << "\n";
 
     for(long long int i = 0; i < size; i++) {
         delete[] points[i];

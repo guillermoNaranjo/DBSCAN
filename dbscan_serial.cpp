@@ -35,6 +35,15 @@ void add_2d_cores(float** points,long long int size,float epsilon){
     }
 }
 
+void no_core_to_core(float** points,long long int size){
+    long long int i = 0;
+    for (i=0; i<size; i++){
+        if (points[i][2]==1){
+            points[i][2]=2;
+        }
+    }
+}
+
 long int region_query(float** points, long long int point, float epsilon,long long int size){
     long int numero_vecinos = 0;
     float distancia = 0;
@@ -58,7 +67,7 @@ void noise_detection(float** points, float epsilon, int min_samples, long long i
         }
     }
     add_2d_cores(points,size,epsilon);
-
+    no_core_to_core(points,size);
     //cout << "Complete" << "\n"; 
 }
 
@@ -96,7 +105,7 @@ int main(int argc, char** argv) {
     const int min_samples = 10;
     const long long int size = atol(argv[1]);
     const string input_file_name = to_string(size)+"_data.csv";
-    const string output_file_name = to_string(size)+"_results.csv";    
+    const string output_file_name = to_string(size)+"_results_serial.csv";    
     float** points = new float*[size];
     double start = 0;
     double end = 0;
