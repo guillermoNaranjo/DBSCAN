@@ -111,8 +111,8 @@ void save_to_CSV(string file_name, float** points, long long int size) {
 int main(int argc, char** argv) {
     //parametrizar programa
     //parámetros para paralelizar
-    int num_hilos = 8;
-    //const int num_hilos = atoi(argv[2]);
+    //int num_hilos = 8;
+    const int num_hilos = atoi(argv[2]);
     const float epsilon = 0.03;
     const int min_samples = 10;
     const long long int size = atol(argv[1]);
@@ -133,7 +133,7 @@ int main(int argc, char** argv) {
 
     load_CSV(input_file_name, points, size);
 
-    omp_set_num_threads(num_hilos);
+    omp_set_num_threads(4);
 
     start = omp_get_wtime();
 
